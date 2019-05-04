@@ -86,6 +86,83 @@ void dekripsi(char *kata)
 	snprintf(fol,sizeof(fol),"%s%s",aslinya,namafilesystem);
 ```
 
+<h2>NOMOR 2</h2>
+<p>
+Semua file video yang tersimpan secara terpecah-pecah (splitted) harus secara otomatis tergabung (joined) dan diletakkan dalam folder “Videos”</p>
+<p>Urutan operasi dari kebutuhan ini adalah:</p>
+<p>* Tepat saat sebelum file system di-mount</p>
+<p>* Secara otomatis folder “Videos” terbuat di root directory file system</p>
+<p>* Misal ada sekumpulan file pecahan video bernama “computer.mkv.000”, “computer.mkv.001”, “computer.mkv.002”, dst. Maka secara otomatis file pecahan tersebut akan di-join menjadi file video “computer.mkv”</p>
+<p>* Untuk mempermudah kalian, dipastikan hanya video file saja yang terpecah menjadi beberapa file. File pecahan tersebut dijamin terletak di root folder fuse</p>
+<p>* Karena mungkin file video sangat banyak sehingga mungkin saja saat menggabungkan file video, file system akan membutuhkan waktu yang lama untuk sukses ter-mount. Maka pastikan saat akan menggabungkan file pecahan video, file system akan membuat 1 thread/proses(fork) baru yang dikhususkan untuk menggabungkan file video tersebut</p>
+<p>* Pindahkan seluruh file video yang sudah ter-join ke dalam folder “Videos”</p>
+<p>* Jangan tampilkan file pecahan di direktori manapun</p>
+<p>* Tepat saat file system akan di-unmount</p>
+<p>* Hapus semua file video yang berada di folder “Videos”, tapi jangan hapus file pecahan yang terdapat di root directory file system
+<p>* Hapus folder “Videos”</p>
+<h2>JAWABAN</h2>
+Fungsi pre_init adalah fungsi yang dipanggil ketika file system akan di mount.
+Awalnya membuat folder Videos. Lalu me-read nama file. Setiap file yang berakhiran .mkv maka lakukan penggabungan.
+
+```
+static void* pre_init(struct fuse_conn_info *conn)
+{
+        char folder[100000] = "/Videos";
+		char folde1r[100000] = "/YOUTUBER";
+		enc(folder);
+		enc(folde1r);
+		char fpath[1000];
+    	sprintf(fpath,"%s%s", dirpath, folder);
+		mkdir(fpath,0755);
+		memset(fpath,0,sizeof(fpath));
+		sprintf(fpath,"%s%s", dirpath, folde1r);
+		mkdir(fpath,0755);
+		memset(fpath,0,sizeof(fpath));
+
+		pid_t child1;
+		child1=fork();
+		if(child1==0){
+			DIR *dp;
+			struct dirent *de;
+			dp = opendir(dirpath);
+			while((de = readdir(dp))){
+				if(strcmp(de->d_name,".")!=0 && strcmp(de->d_name,"..")!=0){
+					char ext[1000] = ".mkv";
+					enc(ext);
+					if(strlen(de->d_name)>7 && strncmp(de->d_name+strlen(de->d_name)-8,ext,4)==0){
+
+							char joined[1000];
+							char video[1000] = "/Videos";
+							enc(video);
+							sprintf(joined,"%s%s/",dirpath,video);
+							strncat(joined,de->d_name,strlen(de->d_name)-4);
+							FILE* mainj;
+							mainj = fopen(joined,"a+");
+							FILE* need;
+							char this[1000];
+							sprintf(this,"%s/%s",dirpath,de->d_name);
+							need = fopen(this,"r");
+							int c;
+							while(1) {
+   								c = fgetc(need);
+   								if( feof(need) ) {
+   								   break;
+   								}
+   								fprintf(mainj,"%c",c);
+   							}
+							
+					}
+				}
+			}
+			exit(EXIT_SUCCESS);
+		}
+
+        (void) conn;
+        return NULL;
+}
+
+```
+
 <h2>NOMOR 3</h2>
 <p>Sebelum diterapkannya file system ini, Atta pernah diserang oleh hacker LAPTOP_RUSAK yang menanamkan user bernama “chipset” dan “ic_controller” serta group “rusak” yang tidak bisa dihapus. Karena paranoid, Atta menerapkan aturan pada file system ini untuk menghapus “file bahaya” yang memiliki spesifikasi:
 Owner Name 	: ‘chipset’ atau ‘ic_controller’
@@ -149,100 +226,170 @@ Jika ditemukan file dengan spesifikasi tersebut ketika membuka direktori, Atta a
 <p> Ketika mengedit suatu file dan melakukan save, maka akan terbuat folder baru bernama Backup kemudian hasil dari save tersebut akan disimpan pada backup dengan nama namafile_[timestamp].ekstensi. Dan ketika file asli dihapus, maka akan dibuat folder bernama RecycleBin, kemudian file yang dihapus beserta semua backup dari file yang dihapus tersebut (jika ada) di zip dengan nama namafile_deleted_[timestamp].zip dan ditaruh ke dalam folder RecycleBin (file asli dan backup terhapus). Dengan format [timestamp] adalah yyyy-MM-dd_HH:mm:ss </p>
 
 <h2>JAWABAN</h2>
-Untuk folder Backup:
+Untuk permasalahan , ketika kita mengedit suatu file maka akan dipanggil fungsi write.
+
+1. Buat folder Backup yang bermode 0755, setelah itu write ulang isi dari file yang diedit dan ditaruh ke variabel buf
+2. Jika file tersebut diedit, maka buat nama file nya dengan menyimpannya di string /Backup%s%s.ekstensi",name,time. Lalu isi file tersebut dengan isi dari variabel buf.
 
 ```
 static int xmp_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi)
 {
-	int res,fd;
-	struct stat st = {0};
-	char namafilesystem[1024];
-	char fol[1024];
-	snprintf(namafilesystem, sizeof(namafilesystem),"%s",path);
-	snprintf(fol,sizeof(fol),"%s%s",aslinya,namafilesystem);
-	fd=open(fol, O_WRONLY);
-	
-	(void) fi;
-	res=pwrite(fd, buf, size, offset);
-	
-		char folderpath[1024];
-		char backup[1024]="/Backup";
-		enkripsi(backup);
-		char ekstensi[1024]=".ekstensi";
-		char namafileawal[1024];
-		snprintf(namafileawal,sizeof(namafileawal),"%s%s",folderpath,path);
-		char namafile[1024];
-		snprintf(namafile,sizeof(namafile),"/%s_",path);
-		char namafilebackup[1024];
-		char timestamp[1024];
-		strcpy(folderpath,aslinya);
-		strcat(folderpath,backup);
-		
-		if (stat(folderpath, &st) == -1) {
-        mkdir(folderpath,0755);
-    }
-    
-		time_t waktu =time(NULL);
-		strftime(timestamp, 20 ,"%Y-%m-%d_%H:%M:%S", localtime(&waktu));
-		strcpy(namafilebackup,namafile);
-		strcat(namafilebackup,timestamp);
-		strcat(namafilebackup,ekstensi);
-		enkripsi(namafilebackup);
-		strcat(folderpath,namafilebackup);
-		rename(namafileawal,folderpath);
-		
-	close(fd);
-	return res;
+	int fd;
+	int res;
+    char fpath[1000];
+    char name[1000];
 
-	int res,fd;
-	char namafilesystem[1024];
-	char fol[1024];
-	snprintf(namafilesystem, sizeof(namafilesystem),"%s",path);
-	enkripsi(namafilesystem);
-	snprintf(fol,sizeof(fol),"%s%s",aslinya,namafilesystem);
+	sprintf(name,"%s",path);
+    enc(name);
+	sprintf(fpath,"%s%s",dirpath,name);
+
+	char newname[1000];
+	char folder[1000] = "/Backup";
+	enc(folder);
+	char folderdir[1000];
+	sprintf(folderdir,"%s%s",dirpath,folder);
+	mkdir(folderdir,0755);
+
+	(void) fi;
+	fd = open(fpath, O_WRONLY);
+	if (fd == -1)
+		return -errno;
+	printf("%s\n",buf);
+	res = pwrite(fd, buf, size, offset);
+	if (res == -1)
+		res = -errno;
+
+	close(fd);
+
+	struct stat sd;
+	if(stat(fpath,&sd)>-1){
+		char t[1000];
+		time_t now = time(NULL);
+		strftime(t, 22, "_%Y-%m-%d_%H:%M:%S", localtime(&now));
+		dec(name);
+		sprintf(newname,"/Backup%s%s.ekstensi",name,t);
+		enc(newname);
+		memset(fpath,'\0',sizeof(fpath));
+		sprintf(fpath,"%s%s",dirpath,newname);
+		// printf("%s\n",fpath);
+	
+		FILE *fptr = fopen(fpath, "w+"); 
+		fprintf(fptr,"%s",buf);
+		fclose(fptr);
+
+		return res;
+	}
+	
+	return res;
+}
 }
 ```
 
-Untuk folder RecycleBin:
+Untuk permasalahan ketika kita menghapus suatu file , maka secara otomatis akan terpanggil fungsi unlink. Jika file tersebut didelete, buat folder bernama RecycleBin. Isi dari folder RecycleBin tersebut ada dua yaitu di file yang kita zip di file system aslinya, dan yang di foler backup.
+Untuk membuat zip saat di file aslinya.
+1. Deklarasikan string yang memuat namafile atau path file itu
+2. Deklarasikan string yang memuat nama file zip nya.
+3. Lakukan zip pada file tersebut dengan memberi nama seperti nama file zipnya dengan menggunakan thread
+Untuk membuat zip saat di file Backup
+1. Cocokkan nama file dengan nama file yang ada di folder backup. Jika nama file sama maka buat deklarasikan string yang memuat namafile atau path file itu dan eklarasikan string yang memuat nama file zip nya.
+2. Lakukan zip pada file tersebut dengan memberi nama seperti nama file zipnya dengan menggunakan thread
 
 ```
 static int xmp_unlink(const char *path)
 {
-	struct stat st = {0};
-	unlink(path);
-	char rb[1024]="/RecycleBin";
-	enkripsi(rb);
-	char folderpath[1024];
-	strcpy(folderpath,aslinya);
-	strcat(folderpath,rb);
-	
-	if (stat(folderpath, &st) == -1) {
-        mkdir(folderpath,0755);
-    }
-	
-	char ekstensi[1024]=".ekstensi";
-	char timestamp[1024];
-	char namafile[1024];
-	char namafilebackup[1024];
-	time_t waktu =time(NULL);
-	strftime(timestamp, 20 ,"%Y-%m-%d_%H:%M:%S", localtime(&waktu));
-	strcpy(namafilebackup,namafile);
-	strcat(namafilebackup,timestamp);
-	strcat(namafilebackup,ekstensi);
-	enkripsi(namafilebackup);
-	strcat(folderpath,namafilebackup);
-	
-	if(!fork())
-	{
-		
-	}
-	else
-	{
-		char *zip[]={"zip -m ",folderpath,NULL};
-		execv("/bin/zip",zip);
-	}
+	int res;
+    char fpath[1000];
+    char name[1000];
+	sprintf(name,"%s",path);
+	if(strstr(name,".swp")==0 && strstr(name,".gooutpustream")==0){
+		char folder[100000] = "/RecycleBin";
+		enc(folder);
+		char fpath[1000];
+    	sprintf(fpath,"%s%s", dirpath, folder);
+		mkdir(fpath,0755);
 
+		char t[1000];
+		time_t now = time(NULL);
+		strftime(t, 22, "_%Y-%m-%d_%H:%M:%S", localtime(&now));
+
+		char zip[1000];
+		char fzip[1000];
+		char fname[1000];
+		memset(zip,0,sizeof(zip));
+		memset(fzip,0,sizeof(fzip));
+		memset(fname,0,sizeof(fname));
+		sprintf(zip,"/RecycleBin%s_deleted_%s.zip",name,t);
+		enc(name);
+		sprintf(fname,"%s%s",dirpath,name);
+		enc(zip);
+		sprintf(fzip,"%s%s",dirpath,zip);
+		pid_t child1;
+		
+		child1=fork();
+		if(child1==0){
+			execl("/usr/bin/zip","/usr/bin/zip","-q","-m","-j",fzip,fname,NULL);
+			exit(EXIT_SUCCESS);
+		}
+		else{
+			wait(NULL);
+		}
+		
+
+		char fback[1000] = "/Backup";
+		enc(fback);
+		char foldbackp[1000];
+		sprintf(foldbackp,"%s%s",dirpath,fback);
+		DIR *dp;
+		struct dirent *de;
+
+		dp = opendir(foldbackp);
+		while((de = readdir(dp))){
+			if(strncmp(name+1,de->d_name,strlen(de->d_name)-29)==0){
+
+				memset(fzip,0,sizeof(fzip));
+				memset(zip,0,sizeof(zip));
+				memset(fname,0,sizeof(fname));
+				dec(name);
+				sprintf(zip,"/RecycleBin%s_deleted_%s.zip",name,t);
+				sprintf(fname,"%s/%s",foldbackp,de->d_name);
+				enc(zip);
+				enc(name);
+				sprintf(fzip,"%s%s",dirpath,zip);
+
+				child1=fork();
+				if(child1==0){
+					execl("/usr/bin/zip","/usr/bin/zip","-q","-m","-j","-u",fzip,fname,NULL);
+					exit(EXIT_SUCCESS);
+				}
+				else{
+					wait(NULL);
+				}
+			}
+		}
+		dec(name);
+		memset(zip,0,sizeof(zip));
+		memset(fzip,0,sizeof(fzip));
+		memset(fname,0,sizeof(fname));
+		sprintf(zip,"/RecycleBin%s_deleted_%s.zip",name,t);
+		enc(name);
+		sprintf(fname,"%s%s",dirpath,name);
+		enc(zip);
+		sprintf(fzip,"%s%s",dirpath,zip);
+		memset(fname,0,sizeof(fname));
+		strncpy(fname,fzip,strlen(fzip));
+		strcat(fzip,".zip");
+		rename(fzip,fname);
+	}
+	else{
+    	enc(name);
+		sprintf(fpath, "%s%s",dirpath,name);
+		res = unlink(fpath);
+		if (res == -1)
+			return -errno;
+	}
 	return 0;
+}
+
 }
 ```
