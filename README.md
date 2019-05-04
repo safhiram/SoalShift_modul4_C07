@@ -404,7 +404,8 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 }
 ```
 
-Untuk permasalahan ketika kita menghapus suatu file , maka secara otomatis akan terpanggil fungsi unlink. Jika file tersebut didelete, buat folder bernama RecycleBin. Isi dari folder RecycleBin tersebut ada dua yaitu di file yang kita zip di file system aslinya, dan yang di foler backup.
+
+<p>Untuk permasalahan ketika kita menghapus suatu file , maka secara otomatis akan terpanggil fungsi unlink. Jika file tersebut didelete, buat folder bernama RecycleBin. Isi dari folder RecycleBin tersebut ada dua yaitu di file yang kita zip di file system aslinya, dan yang di foler backup.</p>
 Untuk membuat zip saat di file aslinya.
 1. Deklarasikan string yang memuat namafile atau path file itu
 2. Deklarasikan string yang memuat nama file zip nya.
@@ -412,6 +413,7 @@ Untuk membuat zip saat di file aslinya.
 Untuk membuat zip saat di file Backup
 1. Cocokkan nama file dengan nama file yang ada di folder backup. Jika nama file sama maka buat deklarasikan string yang memuat namafile atau path file itu dan eklarasikan string yang memuat nama file zip nya.
 2. Lakukan zip pada file tersebut dengan memberi nama seperti nama file zipnya dengan menggunakan thread
+
 
 ```
 static int xmp_unlink(const char *path)
