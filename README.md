@@ -101,6 +101,7 @@ Semua file video yang tersimpan secara terpecah-pecah (splitted) harus secara ot
 <p>* Hapus semua file video yang berada di folder “Videos”, tapi jangan hapus file pecahan yang terdapat di root directory file system
 <p>* Hapus folder “Videos”</p>
 <h2>JAWABAN</h2>
+
 Fungsi pre_init adalah fungsi yang dipanggil ketika file system akan di mount.
 Awalnya membuat folder Videos. Lalu me-read nama file. Setiap file yang berakhiran .mkv maka lakukan penggabungan.
 
@@ -163,6 +164,34 @@ static void* pre_init(struct fuse_conn_info *conn)
 
 ```
 
+<p>Untuk melakukan penghapusan file dan folder, kami membuat fungsi destroy, awalanya buka folder Video menggunakan opendir .</p>
+<p>Baca file satu persatu, jika nama file bukan '.' dan '..', maka lakukan remove file dengan memanggil fungsi remove</p>
+<p>Jika file sudah dihapus semua, maka hapus folder Video</p>
+
+```
+static void post_destroy(void* private_data)
+{
+	char fpath[10000];
+	char folder[100000] = "/Videos";
+	enc(folder);
+    sprintf(fpath,"%s%s", dirpath, folder);
+
+	DIR *dp;
+	struct dirent *de;
+	dp = opendir(fpath);
+	while((de = readdir(dp))){
+		if(strcmp(de->d_name,".")!=0 && strcmp(de->d_name,"..")!=0){
+			char file[1000];
+			sprintf(file,"%s/%s",fpath,de->d_name);
+			remove(file);
+		}
+	}
+	rmdir(fpath);
+
+	return;
+}
+```
+
 <h2>NOMOR 3</h2>
 <p>Sebelum diterapkannya file system ini, Atta pernah diserang oleh hacker LAPTOP_RUSAK yang menanamkan user bernama “chipset” dan “ic_controller” serta group “rusak” yang tidak bisa dihapus. Karena paranoid, Atta menerapkan aturan pada file system ini untuk menghapus “file bahaya” yang memiliki spesifikasi:
 Owner Name 	: ‘chipset’ atau ‘ic_controller’
@@ -222,6 +251,95 @@ Jika ditemukan file dengan spesifikasi tersebut ketika membuka direktori, Atta a
 	}
 	closedir(dp);
 ```
+
+<h2>NOMOR 4</h2>
+<p>Pada folder YOUTUBER, setiap membuat folder permission foldernya akan otomatis menjadi 750. Juga ketika membuat file permissionnya akan otomatis menjadi 640 dan ekstensi filenya akan bertambah “.iz1”. File berekstensi “.iz1” tidak bisa diubah permissionnya dan memunculkan error bertuliskan “File ekstensi iz1 tidak boleh diubah permissionnya.”</p>
+<h2>JAWABAN</h2>
+<p>Pembuatan folder YOUTUBER dilakukan di preinit</p>
+```
+static void* pre_init(struct fuse_conn_info *conn)
+{
+        char folder[100000] = "/Videos";
+		char folde1r[100000] = "/YOUTUBER";
+		enc(folder);
+		enc(folde1r);
+		char fpath[1000];
+    	sprintf(fpath,"%s%s", dirpath, folder);
+		mkdir(fpath,0755);
+		memset(fpath,0,sizeof(fpath));
+		sprintf(fpath,"%s%s", dirpath, folde1r);
+		mkdir(fpath,0755);
+		memset(fpath,0,sizeof(fpath));
+
+```
+<p>Setiap file yang ada di folder tersebut otomatis bermod 640. Hal ini dilakukan di fungsi create. </p>
+<p>Di fungsi ini, setiap mmbuat file maka akan dipanggil fungsi create . Jika dibuat suatu file dan file tersebut berada di folder YOUTUBER maka buat file ekstensi dengan '.iz1'</p>
+
+```
+static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi)
+{
+
+    (void) fi;
+    char fpath[1000];
+    char name[1000];
+	sprintf(name,"%s",path);
+    int res;
+	if(strlen(name)>9 && strncmp(name,"/YOUTUBER",9)==0)
+	{
+		strcat(name,".iz1");
+		enc(name);
+		sprintf(fpath, "%s%s",dirpath,name);
+    	res = creat(fpath, 0640);
+	}
+	else{
+    	enc(name);
+		sprintf(fpath, "%s%s",dirpath,name);
+    	res = creat(fpath, mode);
+	}
+    if(res == -1)
+	return -errno;
+
+    close(res);
+
+    return 0;
+}
+```
+
+<p>Jika file 'iz1' diubah permissionnya maka akan muncul error message yaitu 'File ekstensi iz1 tidak boleh diubah permissionnya'.  Pada permasalahan ini, fungsi chmod dipanggil. </p>
+<p>Awalnya kita cek apakah file yang dibuat berada di folder YOUTUBER dan file tersebut berekstensi '.iz1', apabila iya, maka buat thread untuk membatalkan perubahan permission dan menampilkan pesan error 'File ekstensi iz1 tidak boleh diubah permissionnya'.</p>
+
+```
+static int xmp_chmod(const char *path, mode_t mode)
+{
+	int res;
+    char fpath[1000];
+    char name[1000];
+	sprintf(name,"%s",path);
+	if(strlen(name)>9 && strncmp(name,"/YOUTUBER",9)==0 && strcmp(name+strlen(name)-4,".iz1")==0)
+	{
+		pid_t child1;
+		child1=fork();
+		if(child1==0){
+			execl("/usr/bin/zenity","/usr/bin/zenity","--error","--text=File ekstensi iz1 tidak boleh diubah permissionnya.","--title=Tidak bisa merubah",NULL);
+
+				printf("test\n");
+	}
+		else{
+			wait(NULL);
+		}
+	}
+	else{
+    	enc(name);
+		sprintf(fpath, "%s%s",dirpath,name);
+		res = chmod(fpath, mode);
+	}
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+```
+
 <h2>NOMOR 5</h2>
 <p> Ketika mengedit suatu file dan melakukan save, maka akan terbuat folder baru bernama Backup kemudian hasil dari save tersebut akan disimpan pada backup dengan nama namafile_[timestamp].ekstensi. Dan ketika file asli dihapus, maka akan dibuat folder bernama RecycleBin, kemudian file yang dihapus beserta semua backup dari file yang dihapus tersebut (jika ada) di zip dengan nama namafile_deleted_[timestamp].zip dan ditaruh ke dalam folder RecycleBin (file asli dan backup terhapus). Dengan format [timestamp] adalah yyyy-MM-dd_HH:mm:ss </p>
 
