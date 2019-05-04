@@ -256,6 +256,7 @@ Jika ditemukan file dengan spesifikasi tersebut ketika membuka direktori, Atta a
 <p>Pada folder YOUTUBER, setiap membuat folder permission foldernya akan otomatis menjadi 750. Juga ketika membuat file permissionnya akan otomatis menjadi 640 dan ekstensi filenya akan bertambah “.iz1”. File berekstensi “.iz1” tidak bisa diubah permissionnya dan memunculkan error bertuliskan “File ekstensi iz1 tidak boleh diubah permissionnya.”</p>
 <h2>JAWABAN</h2>
 <p>Pembuatan folder YOUTUBER dilakukan di preinit</p>
+
 ```
 static void* pre_init(struct fuse_conn_info *conn)
 {
@@ -272,6 +273,7 @@ static void* pre_init(struct fuse_conn_info *conn)
 		memset(fpath,0,sizeof(fpath));
 
 ```
+
 <p>Setiap file yang ada di folder tersebut otomatis bermod 640. Hal ini dilakukan di fungsi create. </p>
 <p>Di fungsi ini, setiap mmbuat file maka akan dipanggil fungsi create . Jika dibuat suatu file dan file tersebut berada di folder YOUTUBER maka buat file ekstensi dengan '.iz1'</p>
 
